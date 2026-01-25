@@ -1,0 +1,51 @@
+import { Tabs } from "expo-router";
+import { View } from "react-native";
+import { Home, Search, List, User } from "lucide-react-native";
+
+export default function TabsLayout() {
+    return (
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: {
+                    backgroundColor: '#141414',
+                    borderTopColor: '#221F1F',
+                    height: 60,
+                    paddingBottom: 8,
+                    paddingTop: 8
+                },
+                tabBarActiveTintColor: '#E50914',
+                tabBarInactiveTintColor: '#B3B3B3',
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: "Home",
+                    tabBarIcon: ({ color, size }) => <Home color={color} size={size} />
+                }}
+            />
+            <Tabs.Screen
+                name="new-popular"
+                options={{
+                    title: "New & Hot",
+                    tabBarIcon: ({ color, size }) => <List color={color} size={size} />
+                }}
+            />
+            <Tabs.Screen
+                name="search"
+                options={{
+                    title: "Search",
+                    tabBarIcon: ({ color, size }) => <Search color={color} size={size} />
+                }}
+            />
+            <Tabs.Screen
+                name="account"
+                options={{
+                    title: "My Netflix",
+                    tabBarIcon: ({ color, size }) => <User color={color} size={size} />
+                }}
+            />
+        </Tabs>
+    );
+}
