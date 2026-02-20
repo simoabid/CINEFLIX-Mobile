@@ -1,14 +1,17 @@
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000/api'; // 10.0.2.2 is Android Emulator's localhost alias
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Token management
-let authToken: string | null = localStorage.getItem('auth_token');
+let authToken: string | null = null;
+AsyncStorage.getItem('auth_token').then(t => { authToken = t; }).catch(console.error);
 
 export const setAuthToken = (token: string | null) => {
     authToken = token;
     if (token) {
-        localStorage.setItem('auth_token', token);
+        AsyncStorage.setItem('auth_token', token).catch(console.error);
     } else {
-        localStorage.removeItem('auth_token');
+        AsyncStorage.removeItem('auth_token').catch(console.error);
     }
 };
 

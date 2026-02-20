@@ -128,6 +128,28 @@ export interface Video {
     published_at: string;
 }
 
+// Collection progress
+export interface FranchiseProgress {
+    watched_films: number[];
+    total_films: number;
+    completion_percentage: number;
+    viewing_order: 'release' | 'chronological';
+    current_film?: Movie;
+    next_film?: Movie;
+    last_watched?: string;
+}
+
+export interface MarathonSession {
+    collection_id: number;
+    current_film_index: number;
+    viewing_order: 'release' | 'chronological';
+    started_at: string;
+    completed_films: number[];
+    total_runtime_watched: number;
+    breaks_taken: number;
+    paused_at?: string;
+}
+
 export interface CastMember {
     id: number;
     name: string;
@@ -267,6 +289,7 @@ export interface CollectionDetails extends Collection {
     genre_categories: string[];
     studio: string;
     completion_progress?: number;
+    user_progress?: FranchiseProgress | null;
 }
 
 export type CollectionType =
@@ -281,4 +304,86 @@ export type CollectionType =
     | 'incomplete_series';
 
 export type CollectionStatus = 'complete' | 'ongoing' | 'incomplete';
+
+
+// New Types for Watch Service & Downloads
+
+export interface WatchProgress {
+    contentId: number;
+    contentType: 'movie' | 'tv';
+    currentTime: number;
+    duration: number;
+    percentage: number;
+    lastWatched: string;
+}
+
+export interface WatchingSession {
+    id: string;
+    contentId: number;
+    contentType: 'movie' | 'tv';
+    startedAt: string;
+    endedAt?: string;
+    watchTime: number;
+    progress: WatchProgress;
+    quality: string;
+    device: string;
+    ipAddress: string;
+}
+
+export interface ContentRating {
+    userId: string;
+    contentId: number;
+    contentType: 'movie' | 'tv';
+    rating: number;
+    review?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface BookmarkedScene {
+    id: string;
+    contentId: number;
+    contentType: 'movie' | 'tv';
+    timestamp: number;
+    description: string;
+    createdAt: string;
+}
+
+export interface StreamSource {
+    id: string;
+    name: string;
+    url: string;
+    type: 'direct' | 'hls' | 'mp4';
+    quality: 'SD' | 'HD' | 'FHD' | '4K';
+    fileSize: string;
+    reliability: 'Fast' | 'Stable' | 'Premium';
+    isAdFree: boolean;
+    language: string;
+    subtitles: string[];
+}
+
+export interface DownloadOption {
+    id: string;
+    quality: '480p' | '720p' | '1080p' | '4K';
+    format: 'MP4' | 'MKV';
+    fileSize: string;
+    codec: string;
+    url: string;
+    estimatedDownloadTime: string;
+}
+
+export interface TorrentSource {
+    id: string;
+    name: string;
+    magnetLink: string;
+    quality: 'CAM' | 'TS' | 'HDRip' | 'BluRay' | 'WEBRip';
+    fileSize: string;
+    seeders: number;
+    leechers: number;
+    health: 'Excellent' | 'Good' | 'Fair' | 'Poor';
+    releaseGroup: string;
+    uploadedBy: string;
+    isTrusted: boolean;
+    uploadDate: string;
+}
 

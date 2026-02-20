@@ -1,5 +1,7 @@
 import { myListApi } from './api';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const STORAGE_KEY = 'cineflix_watch_progress';
 
 export interface ProgressData {
@@ -38,9 +40,9 @@ class ProgressService {
     }
 
     // Get progress for a specific item
-    getProgress(contentId: number, contentType: 'movie' | 'tv'): ProgressData | null {
+    async getProgress(contentId: number, contentType: 'movie' | 'tv'): Promise<ProgressData | null> {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
+            const stored = await AsyncStorage.getItem(STORAGE_KEY);
             if (!stored) return null;
 
             const parsed = JSON.parse(stored);
@@ -52,12 +54,12 @@ class ProgressService {
     }
 
     // Private: Save single item to localStorage map
-    private saveToLocal(key: string, data: ProgressData) {
+    private async saveToLocal(key: string, data: ProgressData) {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
+            const stored = await AsyncStorage.getItem(STORAGE_KEY);
             const parsed = stored ? JSON.parse(stored) : {};
             parsed[key] = data;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         } catch (e) {
             console.warn('Failed to save progress locally', e);
         }
@@ -91,7 +93,7 @@ class ProgressService {
     // Sync local progress to cloud (called on login)
     async syncLocalToCloud() {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
+            const stored = await AsyncStorage.getItem(STORAGE_KEY);
             if (!stored) return;
 
             const parsed = JSON.parse(stored);

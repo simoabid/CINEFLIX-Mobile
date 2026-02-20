@@ -275,7 +275,7 @@ export default function HomeScreen() {
                         if (details.logo_path) {
                             setHeroLogos(prev => ({
                                 ...prev,
-                                [movie.id]: tmdb.getImageUrl(details.logo_path, 'w500')
+                                [movie.id]: tmdb.getImageUrl(details.logo_path!, 'w500')
                             }));
                         }
                     } catch (error) {
@@ -365,7 +365,7 @@ export default function HomeScreen() {
             <StatusBar style="light" />
 
             {/* App Logo Overlay */}
-            <SafeAreaView className="absolute top-0 left-0 z-50 pointer-events-none">
+            <SafeAreaView className="absolute top-0 left-5 z-50 pointer-events-none">
                 <Image
                     source={require('../../assets/images/logo.png')}
                     style={{

@@ -86,18 +86,19 @@ export function computeCollectionStats(allProgress: { [collectionId: number]: Fr
   };
 }
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export class CollectionsService {
   /**
    * Retrieve stored franchise progress from localStorage with error handling.
    * Returns an object mapping collection IDs to FranchiseProgress or an empty object on failure.
    */
-  private static getStoredProgress(): { [collectionId: number]: FranchiseProgress } {
+  private static async getStoredProgress(): Promise<{ [collectionId: number]: FranchiseProgress }> {
     try {
-      const stored = localStorage.getItem(COLLECTIONS_STORAGE_KEY);
+      const stored = await AsyncStorage.getItem(COLLECTIONS_STORAGE_KEY);
       const parsed = safeParse<{ [collectionId: number]: FranchiseProgress }>(stored);
       return parsed || {};
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('getStoredProgress: error reading progress from storage', error);
       return {};
     }
@@ -106,11 +107,10 @@ export class CollectionsService {
   /**
    * Persist franchise progress into localStorage with error handling.
    */
-  private static saveProgress(progress: { [collectionId: number]: FranchiseProgress }): void {
+  private static async saveProgress(progress: { [collectionId: number]: FranchiseProgress }): Promise<void> {
     try {
-      localStorage.setItem(COLLECTIONS_STORAGE_KEY, JSON.stringify(progress));
+      await AsyncStorage.setItem(COLLECTIONS_STORAGE_KEY, JSON.stringify(progress));
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('saveProgress: failed to save progress to storage', error);
     }
   }
@@ -119,13 +119,12 @@ export class CollectionsService {
    * Retrieve stored marathon sessions from localStorage with error handling.
    * Returns an object mapping collection IDs to MarathonSession or an empty object on failure.
    */
-  private static getStoredSessions(): { [collectionId: number]: MarathonSession } {
+  private static async getStoredSessions(): Promise<{ [collectionId: number]: MarathonSession }> {
     try {
-      const stored = localStorage.getItem(MARATHON_STORAGE_KEY);
+      const stored = await AsyncStorage.getItem(MARATHON_STORAGE_KEY);
       const parsed = safeParse<{ [collectionId: number]: MarathonSession }>(stored);
       return parsed || {};
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('getStoredSessions: error reading sessions from storage', error);
       return {};
     }
@@ -134,18 +133,17 @@ export class CollectionsService {
   /**
    * Persist marathon sessions into localStorage with error handling.
    */
-  private static saveSessions(sessions: { [collectionId: number]: MarathonSession }): void {
+  private static async saveSessions(sessions: { [collectionId: number]: MarathonSession }): Promise<void> {
     try {
-      localStorage.setItem(MARATHON_STORAGE_KEY, JSON.stringify(sessions));
+      await AsyncStorage.setItem(MARATHON_STORAGE_KEY, JSON.stringify(sessions));
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('saveSessions: failed to save sessions to storage', error);
     }
   }
 
   // Progress tracking methods
-  static markFilmWatched(collectionId: number, filmId: number): void {
-    const allProgress = this.getStoredProgress();
+  static async markFilmWatched(collectionId: number, filmId: number): Promise<void> {
+    const allProgress = await this.getStoredProgress();
     const progress: FranchiseProgress = allProgress[collectionId] || {
       watched_films: [],
       total_films: 0,
@@ -165,11 +163,11 @@ export class CollectionsService {
     }
 
     allProgress[collectionId] = progress;
-    this.saveProgress(allProgress);
+    await this.saveProgress(allProgress);
   }
 
-  static markFilmUnwatched(collectionId: number, filmId: number): void {
-    const allProgress = this.getStoredProgress();
+  static async markFilmUnwatched(collectionId: number, filmId: number): Promise<void> {
+    const allProgress = await this.getStoredProgress();
     const progress = allProgress[collectionId];
 
     if (progress && Array.isArray(progress.watched_films)) {
@@ -177,17 +175,17 @@ export class CollectionsService {
       const totalFilms = typeof progress.total_films === 'number' && progress.total_films > 0 ? progress.total_films : 0;
       progress.completion_percentage = totalFilms > 0 ? (progress.watched_films.length / totalFilms) * 100 : 0;
       allProgress[collectionId] = progress;
-      this.saveProgress(allProgress);
+      await this.saveProgress(allProgress);
     }
   }
 
-  static getFranchiseProgress(collectionId: number): FranchiseProgress | null {
-    const allProgress = this.getStoredProgress();
+  static async getFranchiseProgress(collectionId: number): Promise<FranchiseProgress | null> {
+    const allProgress = await this.getStoredProgress();
     return allProgress[collectionId] || null;
   }
 
-  static initializeFranchiseProgress(collection: CollectionDetails): FranchiseProgress {
-    const allProgress = this.getStoredProgress();
+  static async initializeFranchiseProgress(collection: CollectionDetails): Promise<FranchiseProgress> {
+    const allProgress = await this.getStoredProgress();
 
     if (!allProgress[collection.id]) {
       const progress: FranchiseProgress = {
@@ -200,27 +198,27 @@ export class CollectionsService {
       };
 
       allProgress[collection.id] = progress;
-      this.saveProgress(allProgress);
+      await this.saveProgress(allProgress);
       return progress;
     }
 
     return allProgress[collection.id];
   }
 
-  static updateViewingOrder(collectionId: number, order: 'release' | 'chronological'): void {
-    const allProgress = this.getStoredProgress();
+  static async updateViewingOrder(collectionId: number, order: 'release' | 'chronological'): Promise<void> {
+    const allProgress = await this.getStoredProgress();
     const progress = allProgress[collectionId];
 
     if (progress) {
       progress.viewing_order = order;
       allProgress[collectionId] = progress;
-      this.saveProgress(allProgress);
+      await this.saveProgress(allProgress);
     }
   }
 
   // Marathon session methods
-  static startMarathonSession(collection: CollectionDetails, viewingOrder: 'release' | 'chronological' = 'release'): MarathonSession {
-    const sessions = this.getStoredSessions();
+  static async startMarathonSession(collection: CollectionDetails, viewingOrder: 'release' | 'chronological' = 'release'): Promise<MarathonSession> {
+    const sessions = await this.getStoredSessions();
 
     const session: MarathonSession = {
       collection_id: collection.id,
@@ -233,73 +231,73 @@ export class CollectionsService {
     };
 
     sessions[collection.id] = session;
-    this.saveSessions(sessions);
+    await this.saveSessions(sessions);
 
     // Initialize progress if not exists
-    this.initializeFranchiseProgress(collection);
+    await this.initializeFranchiseProgress(collection);
 
     return session;
   }
 
-  static getMarathonSession(collectionId: number): MarathonSession | null {
-    const sessions = this.getStoredSessions();
+  static async getMarathonSession(collectionId: number): Promise<MarathonSession | null> {
+    const sessions = await this.getStoredSessions();
     return sessions[collectionId] || null;
   }
 
-  static updateMarathonProgress(collectionId: number, filmIndex: number, runtime: number): void {
-    const sessions = this.getStoredSessions();
+  static async updateMarathonProgress(collectionId: number, filmIndex: number, runtime: number): Promise<void> {
+    const sessions = await this.getStoredSessions();
     const session = sessions[collectionId];
 
     if (session) {
       session.current_film_index = filmIndex;
       session.total_runtime_watched = (typeof session.total_runtime_watched === 'number' ? session.total_runtime_watched : 0) + (typeof runtime === 'number' ? runtime : 0);
       sessions[collectionId] = session;
-      this.saveSessions(sessions);
+      await this.saveSessions(sessions);
     }
   }
 
-  static pauseMarathonSession(collectionId: number): void {
-    const sessions = this.getStoredSessions();
+  static async pauseMarathonSession(collectionId: number): Promise<void> {
+    const sessions = await this.getStoredSessions();
     const session = sessions[collectionId];
 
     if (session) {
       session.paused_at = new Date().toISOString();
       sessions[collectionId] = session;
-      this.saveSessions(sessions);
+      await this.saveSessions(sessions);
     }
   }
 
-  static resumeMarathonSession(collectionId: number): void {
-    const sessions = this.getStoredSessions();
+  static async resumeMarathonSession(collectionId: number): Promise<void> {
+    const sessions = await this.getStoredSessions();
     const session = sessions[collectionId];
 
     if (session) {
       delete session.paused_at;
       sessions[collectionId] = session;
-      this.saveSessions(sessions);
+      await this.saveSessions(sessions);
     }
   }
 
-  static completeMarathonSession(collectionId: number): void {
-    const sessions = this.getStoredSessions();
+  static async completeMarathonSession(collectionId: number): Promise<void> {
+    const sessions = await this.getStoredSessions();
     delete sessions[collectionId];
-    this.saveSessions(sessions);
+    await this.saveSessions(sessions);
   }
 
   // Statistics and analytics
-  static getCollectionStats(): {
+  static async getCollectionStats(): Promise<{
     totalCollections: number;
     completedCollections: number;
     inProgressCollections: number;
     totalWatchTime: number;
     averageCompletion: number;
-  } {
-    const allProgress = this.getStoredProgress();
+  }> {
+    const allProgress = await this.getStoredProgress();
     return computeCollectionStats(allProgress);
   }
 
-  static getRecommendedCollections(collections: CollectionDetails[]): CollectionDetails[] {
-    const allProgress = this.getStoredProgress();
+  static async getRecommendedCollections(collections: CollectionDetails[]): Promise<CollectionDetails[]> {
+    const allProgress = await this.getStoredProgress();
 
     // Get user's preferred genres from completed collections
     const completedCollections = Object.entries(allProgress)
@@ -325,8 +323,8 @@ export class CollectionsService {
       .slice(0, 6);
   }
 
-  static getContinueWatching(collections: CollectionDetails[]): CollectionDetails[] {
-    const allProgress = this.getStoredProgress();
+  static async getContinueWatching(collections: CollectionDetails[]): Promise<CollectionDetails[]> {
+    const allProgress = await this.getStoredProgress();
 
     return collections
       .filter(collection => {
@@ -344,16 +342,16 @@ export class CollectionsService {
   }
 
   // Utility methods
-  static enhanceCollectionsWithProgress(collections: CollectionDetails[]): CollectionDetails[] {
-    const allProgress = this.getStoredProgress();
+  static async enhanceCollectionsWithProgress(collections: CollectionDetails[]): Promise<CollectionDetails[]> {
+    const allProgress = await this.getStoredProgress();
 
     return collections.map(collection => transformCollectionWithProgress(collection, allProgress));
   }
 
-  static exportProgressData(): string {
+  static async exportProgressData(): Promise<string> {
     try {
-      const progress = this.getStoredProgress();
-      const sessions = this.getStoredSessions();
+      const progress = await this.getStoredProgress();
+      const sessions = await this.getStoredSessions();
 
       return JSON.stringify({
         progress,
@@ -361,26 +359,24 @@ export class CollectionsService {
         exportedAt: new Date().toISOString()
       }, null, 2);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('exportProgressData: failed to export data', error);
       return JSON.stringify({ progress: {}, sessions: {}, exportedAt: new Date().toISOString() }, null, 2);
     }
   }
 
-  static importProgressData(data: string): boolean {
+  static async importProgressData(data: string): Promise<boolean> {
     try {
       const parsed = safeParse<any>(data);
       if (!parsed || typeof parsed !== 'object') return false;
 
       if (parsed.progress && typeof parsed.progress === 'object') {
-        this.saveProgress(parsed.progress);
+        await this.saveProgress(parsed.progress);
       }
       if (parsed.sessions && typeof parsed.sessions === 'object') {
-        this.saveSessions(parsed.sessions);
+        await this.saveSessions(parsed.sessions);
       }
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('importProgressData: Error importing progress data:', error);
       return false;
     }

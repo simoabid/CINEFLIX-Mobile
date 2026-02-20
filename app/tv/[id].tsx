@@ -9,6 +9,8 @@ import { ChevronLeft, Play, Plus, Share2, Star, Clock, Calendar, X, Info, Instag
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Haptics from 'expo-haptics';
+import { myListService } from '../../services/myListService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -104,6 +106,17 @@ export default function TVDetailScreen() {
     };
 
     // --- Actions ---
+
+    const handleAddToList = async () => {
+        if (!content) return;
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await myListService.addToList(content, 'tv');
+            console.log('Added to list:', content.id);
+        } catch (error) {
+            console.error('Failed to add to list', error);
+        }
+    };
 
     const openTrailer = (videoKey?: string) => {
         const key = videoKey || (videos.length > 0 ? videos[0].key : null);
@@ -280,7 +293,9 @@ export default function TVDetailScreen() {
                                     <Text className="text-black font-black text-base ml-2">Play</Text>
                                 </Pressable>
 
-                                <Pressable className="flex-1 bg-gray-800/90 rounded-xl flex-row items-center justify-center h-12 active:scale-95 border border-white/20">
+                                <Pressable
+                                    onPress={handleAddToList}
+                                    className="flex-1 bg-gray-800/90 rounded-xl flex-row items-center justify-center h-12 active:scale-95 border border-white/20">
                                     <Plus size={20} color="white" />
                                     <Text className="text-white font-bold text-base ml-2">My List</Text>
                                 </Pressable>
@@ -524,18 +539,7 @@ export default function TVDetailScreen() {
                                 </View>
                             </View>
 
-                            {/* Creator */}
-                            {content.created_by && content.created_by.length > 0 && (
-                                <View className="flex-row items-center gap-3">
-                                    <View className="w-10 h-10 rounded-full bg-green-500/20 items-center justify-center">
-                                        <User size={20} color="#22C55E" />
-                                    </View>
-                                    <View>
-                                        <Text className="text-gray-400 text-xs uppercase font-bold tracking-wider">Creator</Text>
-                                        <Text className="text-white font-bold text-lg">{content.created_by[0].name}</Text>
-                                    </View>
-                                </View>
-                            )}
+
                         </View>
                     </View>
 
@@ -571,14 +575,13 @@ export default function TVDetailScreen() {
                                 </View>
                             )}
 
-                            {/* Last Air Date */}
-                            {content.last_air_date && (
+                            {content.first_air_date && (
                                 <View className="bg-gray-900/50 p-4 rounded-xl border border-white/5 flex-row items-center justify-between">
                                     <View className="flex-row items-center gap-3">
                                         <View className="w-8 h-8 rounded-full bg-orange-500/20 items-center justify-center"><Calendar size={16} color="#F97316" /></View>
                                         <View>
                                             <Text className="text-gray-400 text-xs uppercase font-bold">Last Air Date</Text>
-                                            <Text className="text-white font-semibold">{new Date(content.last_air_date).toLocaleDateString()}</Text>
+                                            <Text className="text-white font-semibold">{new Date(content.first_air_date).toLocaleDateString()}</Text>
                                         </View>
                                     </View>
                                 </View>

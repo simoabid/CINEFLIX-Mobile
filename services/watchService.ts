@@ -1,5 +1,7 @@
 import { WatchProgress, WatchingSession, ContentRating, BookmarkedScene, StreamSource, DownloadOption, TorrentSource } from '../types';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 type HttpFetcher<T> = (payload: { contentId: number; contentType: 'movie' | 'tv' }) => Promise<T[]>;
 
 /**
@@ -17,41 +19,45 @@ function parseJSONSafe<T>(raw: string | null): T | null {
 }
 
 /**
- * Helper to get localStorage item by key, safely parsed.
- * @param key - localStorage key
+ * Helper to get AsyncStorage item by key, safely parsed.
+ * @param key - storage key
  */
-function lsGetParsed<T>(key: string): T | null {
-  const raw = localStorage.getItem(key);
+async function lsGetParsed<T>(key: string): Promise<T | null> {
+  const raw = await AsyncStorage.getItem(key);
   return parseJSONSafe<T>(raw);
 }
 
 /**
- * Helper to set localStorage item with JSON stringification.
- * @param key - localStorage key
+ * Helper to set AsyncStorage item with JSON stringification.
+ * @param key - storage key
  * @param value - value to store
  */
-function lsSet<T>(key: string, value: T): void {
+async function lsSet<T>(key: string, value: T): Promise<void> {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    await AsyncStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.error('lsSet: failed to stringify or set localStorage', err);
+    console.error('lsSet: failed to stringify or set storage', err);
   }
 }
 
 /**
- * Iterate over localStorage keys with a prefix and invoke callback with parsed data.
+ * Iterate over AsyncStorage keys with a prefix and invoke callback with parsed data.
  * @param prefix - key prefix to filter
  * @param callback - fn invoked with key and parsed data (if parsed successfully)
  */
-function iterateLocalStorageWithPrefix<T>(prefix: string, callback: (key: string, item: T) => void): void {
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(prefix)) {
-      const parsed = lsGetParsed<T>(key);
+async function iterateLocalStorageWithPrefix<T>(prefix: string, callback: (key: string, item: T) => void): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const matchedKeys = keys.filter((k: string) => k.startsWith(prefix));
+    const items = await AsyncStorage.multiGet(matchedKeys);
+    for (const [key, raw] of items) {
+      const parsed = parseJSONSafe<T>(raw);
       if (parsed) {
         callback(key, parsed);
       }
     }
+  } catch (e) {
+    console.error(e);
   }
 }
 
@@ -295,9 +301,9 @@ class WatchService {
    * Save watch progress for a piece of content.
    * @param progress - watch progress object
    */
-  saveWatchProgress(progress: WatchProgress): void {
+  async saveWatchProgress(progress: WatchProgress): Promise<void> {
     const key = `watch_progress_${progress.contentType}_${progress.contentId}`;
-    lsSet(key, progress);
+    await lsSet(key, progress);
   }
 
   /**
@@ -305,17 +311,17 @@ class WatchService {
    * @param contentId - numeric content id
    * @param contentType - 'movie' or 'tv'
    */
-  getWatchProgress(contentId: number, contentType: 'movie' | 'tv'): WatchProgress | null {
+  async getWatchProgress(contentId: number, contentType: 'movie' | 'tv'): Promise<WatchProgress | null> {
     const key = `watch_progress_${contentType}_${contentId}`;
-    return lsGetParsed<WatchProgress>(key);
+    return await lsGetParsed<WatchProgress>(key);
   }
 
   /**
    * Retrieve all saved watch progress entries sorted by last watched desc.
    */
-  getAllWatchProgress(): WatchProgress[] {
+  async getAllWatchProgress(): Promise<WatchProgress[]> {
     const progress: WatchProgress[] = [];
-    iterateLocalStorageWithPrefix<WatchProgress>('watch_progress_', (_key, item) => {
+    await iterateLocalStorageWithPrefix<WatchProgress>('watch_progress_', (_key, item) => {
       progress.push(item);
     });
     return progress.sort((a, b) => new Date(b.lastWatched).getTime() - new Date(a.lastWatched).getTime());
@@ -326,7 +332,7 @@ class WatchService {
    * @param contentId - id of content
    * @param contentType - 'movie' or 'tv'
    */
-  startWatchingSession(contentId: number, contentType: 'movie' | 'tv'): WatchingSession {
+  async startWatchingSession(contentId: number, contentType: 'movie' | 'tv'): Promise<WatchingSession> {
     const session: WatchingSession = {
       id: generateId(),
       contentId,
@@ -342,13 +348,13 @@ class WatchService {
         lastWatched: nowISO()
       },
       quality: '1080p',
-      device: navigator.userAgent,
+      device: navigator.userAgent || 'mobile_device',
       ipAddress: 'Unknown'
     };
 
-    const sessions = this.getWatchingSessions();
+    const sessions = await this.getWatchingSessions();
     sessions.push(session);
-    lsSet('watching_sessions', sessions);
+    await lsSet('watching_sessions', sessions);
 
     return session;
   }
@@ -357,19 +363,19 @@ class WatchService {
    * End a watching session by setting endedAt timestamp.
    * @param sessionId - session id string
    */
-  endWatchingSession(sessionId: string): void {
-    const sessions = this.getWatchingSessions();
+  async endWatchingSession(sessionId: string): Promise<void> {
+    const sessions = await this.getWatchingSessions();
     const updatedSessions = sessions.map(session =>
       session.id === sessionId ? { ...session, endedAt: nowISO() } : session
     );
-    lsSet('watching_sessions', updatedSessions);
+    await lsSet('watching_sessions', updatedSessions);
   }
 
   /**
    * Get all watching sessions.
    */
-  getWatchingSessions(): WatchingSession[] {
-    const saved = lsGetParsed<WatchingSession[]>('watching_sessions');
+  async getWatchingSessions(): Promise<WatchingSession[]> {
+    const saved = await lsGetParsed<WatchingSession[]>('watching_sessions');
     return saved ? saved : [];
   }
 
@@ -380,7 +386,7 @@ class WatchService {
    * @param rating - numeric rating
    * @param review - optional review text
    */
-  rateContent(contentId: number, contentType: 'movie' | 'tv', rating: number, review?: string): void {
+  async rateContent(contentId: number, contentType: 'movie' | 'tv', rating: number, review?: string): Promise<void> {
     const contentRating: ContentRating = {
       userId: 'current_user',
       contentId,
@@ -392,7 +398,7 @@ class WatchService {
     };
 
     const key = `rating_${contentType}_${contentId}`;
-    lsSet(key, contentRating);
+    await lsSet(key, contentRating);
   }
 
   /**
@@ -400,17 +406,17 @@ class WatchService {
    * @param contentId - numeric id
    * @param contentType - 'movie' or 'tv'
    */
-  getContentRating(contentId: number, contentType: 'movie' | 'tv'): ContentRating | null {
+  async getContentRating(contentId: number, contentType: 'movie' | 'tv'): Promise<ContentRating | null> {
     const key = `rating_${contentType}_${contentId}`;
-    return lsGetParsed<ContentRating>(key);
+    return await lsGetParsed<ContentRating>(key);
   }
 
   /**
    * Retrieve all ratings sorted by creation date desc.
    */
-  getAllRatings(): ContentRating[] {
+  async getAllRatings(): Promise<ContentRating[]> {
     const ratings: ContentRating[] = [];
-    iterateLocalStorageWithPrefix<ContentRating>('rating_', (_key, item) => {
+    await iterateLocalStorageWithPrefix<ContentRating>('rating_', (_key, item) => {
       ratings.push(item);
     });
     return ratings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -420,18 +426,18 @@ class WatchService {
    * Add a new bookmark for content.
    * @param bookmark - bookmark object without id/createdAt
    */
-  addBookmark(bookmark: Omit<BookmarkedScene, 'id' | 'createdAt'>): BookmarkedScene {
+  async addBookmark(bookmark: Omit<BookmarkedScene, 'id' | 'createdAt'>): Promise<BookmarkedScene> {
     const newBookmark: BookmarkedScene = {
       ...bookmark,
       id: generateId(),
       createdAt: nowISO()
     };
 
-    const bookmarks = this.getBookmarks(bookmark.contentId, bookmark.contentType);
+    const bookmarks = await this.getBookmarks(bookmark.contentId, bookmark.contentType);
     bookmarks.push(newBookmark);
 
     const key = `bookmarks_${bookmark.contentType}_${bookmark.contentId}`;
-    lsSet(key, bookmarks);
+    await lsSet(key, bookmarks);
 
     return newBookmark;
   }
@@ -441,12 +447,12 @@ class WatchService {
    * @param bookmarkId - id of bookmark to update
    * @param updates - partial fields to update
    */
-  updateBookmark(bookmarkId: string, updates: Partial<BookmarkedScene>): void {
-    iterateLocalStorageWithPrefix<BookmarkedScene[]>('bookmarks_', (key, bookmarks) => {
+  async updateBookmark(bookmarkId: string, updates: Partial<BookmarkedScene>): Promise<void> {
+    await iterateLocalStorageWithPrefix<BookmarkedScene[]>('bookmarks_', async (key, bookmarks) => {
       const bookmarkIndex = bookmarks.findIndex(b => b.id === bookmarkId);
       if (bookmarkIndex !== -1) {
         bookmarks[bookmarkIndex] = { ...bookmarks[bookmarkIndex], ...updates };
-        lsSet(key, bookmarks);
+        await lsSet(key, bookmarks);
       }
     });
   }
@@ -455,11 +461,11 @@ class WatchService {
    * Delete a bookmark by id from all bookmark lists.
    * @param bookmarkId - id to delete
    */
-  deleteBookmark(bookmarkId: string): void {
-    iterateLocalStorageWithPrefix<BookmarkedScene[]>('bookmarks_', (key, bookmarks) => {
+  async deleteBookmark(bookmarkId: string): Promise<void> {
+    await iterateLocalStorageWithPrefix<BookmarkedScene[]>('bookmarks_', async (key, bookmarks) => {
       const filteredBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
       if (filteredBookmarks.length !== bookmarks.length) {
-        lsSet(key, filteredBookmarks);
+        await lsSet(key, filteredBookmarks);
       }
     });
   }
@@ -469,18 +475,18 @@ class WatchService {
    * @param contentId - content id
    * @param contentType - 'movie' | 'tv'
    */
-  getBookmarks(contentId: number, contentType: 'movie' | 'tv'): BookmarkedScene[] {
+  async getBookmarks(contentId: number, contentType: 'movie' | 'tv'): Promise<BookmarkedScene[]> {
     const key = `bookmarks_${contentType}_${contentId}`;
-    const saved = lsGetParsed<BookmarkedScene[]>(key);
+    const saved = await lsGetParsed<BookmarkedScene[]>(key);
     return saved ? saved : [];
   }
 
   /**
    * Retrieve all bookmarks across content sorted by createdAt desc.
    */
-  getAllBookmarks(): BookmarkedScene[] {
+  async getAllBookmarks(): Promise<BookmarkedScene[]> {
     const bookmarks: BookmarkedScene[] = [];
-    iterateLocalStorageWithPrefix<BookmarkedScene[]>('bookmarks_', (_key, items) => {
+    await iterateLocalStorageWithPrefix<BookmarkedScene[]>('bookmarks_', (_key, items) => {
       bookmarks.push(...items);
     });
     return bookmarks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -544,13 +550,13 @@ class WatchService {
   /**
    * Compute watching statistics from sessions.
    */
-  getWatchingStats(): {
+  async getWatchingStats(): Promise<{
     totalWatchTime: number;
     averageSession: number;
     mostWatchedType: 'movie' | 'tv';
     favoriteGenres: string[];
-  } {
-    const sessions = this.getWatchingSessions();
+  }> {
+    const sessions = await this.getWatchingSessions();
     const totalWatchTime = sessions.reduce((total, session) => total + (session.watchTime || 0), 0);
     const averageSession = sessions.length > 0 ? totalWatchTime / sessions.length : 0;
 
@@ -570,12 +576,12 @@ class WatchService {
    * Remove old data older than daysOld (default 30 days).
    * @param daysOld - number of days; items older than this will be removed
    */
-  cleanupOldData(daysOld: number = 30): void {
+  async cleanupOldData(daysOld: number = 30): Promise<void> {
     const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
 
-    const sessions = this.getWatchingSessions();
+    const sessions = await this.getWatchingSessions();
     const recentSessions = sessions.filter(session => new Date(session.startedAt) > cutoffDate);
-    lsSet('watching_sessions', recentSessions);
+    await lsSet('watching_sessions', recentSessions);
 
     console.log(`Cleaned up ${sessions.length - recentSessions.length} old watching sessions`);
   }

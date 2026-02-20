@@ -37,16 +37,28 @@ const LongPressPreviewModal: React.FC<LongPressPreviewModalProps> = ({
     const rating = item.vote_average || 0;
     const overview = item.overview || 'No description available.';
 
-    const handleAddToList = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // TODO: Integrate with My List service
-        console.log('Add to list:', item.id);
+    const handleAddToList = async () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            // Dynamic import of the service to avoid circular dependencies if any
+            const { myListService } = await import('../services/myListService');
+            // Assuming the function toggleInList is available on the service directly or via hook
+            await myListService.addToList(item, mediaType);
+            console.log('Added to list:', item.id);
+        } catch (error) {
+            console.error('Failed to add to list', error);
+        }
     };
 
-    const handleLike = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // TODO: Integrate with Like/Favorites service
-        console.log('Like:', item.id);
+    const handleLike = async () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const { myListService } = await import('../services/myListService');
+            await myListService.likeContent(item, mediaType);
+            console.log('Liked:', item.id);
+        } catch (error) {
+            console.error('Failed to like', error);
+        }
     };
 
     return (

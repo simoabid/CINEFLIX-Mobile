@@ -26,9 +26,9 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="new-popular"
+                name="my-list"
                 options={{
-                    title: "New & Hot",
+                    title: "My List",
                     tabBarIcon: ({ color, size }) => <List color={color} size={size} />
                 }}
             />

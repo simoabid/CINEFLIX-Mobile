@@ -11,6 +11,8 @@ import Animated, { FadeIn, FadeInDown, SlideInDown } from "react-native-reanimat
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DetailSkeleton } from "../../components/SkeletonLoader";
+import * as Haptics from 'expo-haptics';
+import { myListService } from '../../services/myListService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -128,6 +130,17 @@ export default function DetailScreen() {
     };
 
     // --- Actions ---
+
+    const handleAddToList = async () => {
+        if (!content) return;
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await myListService.addToList(content, mediaType);
+            console.log('Added to list:', content.id);
+        } catch (error) {
+            console.error('Failed to add to list', error);
+        }
+    };
 
     const openTrailer = (videoKey?: string) => {
         const key = videoKey || (videos.length > 0 ? videos[0].key : null);
@@ -304,7 +317,9 @@ export default function DetailScreen() {
                                     <Text className="text-black font-black text-base ml-2">Play</Text>
                                 </Pressable>
 
-                                <Pressable className="flex-1 bg-gray-800/90 rounded-xl flex-row items-center justify-center h-12 active:scale-95 border border-white/20">
+                                <Pressable
+                                    onPress={handleAddToList}
+                                    className="flex-1 bg-gray-800/90 rounded-xl flex-row items-center justify-center h-12 active:scale-95 border border-white/20">
                                     <Plus size={20} color="white" />
                                     <Text className="text-white font-bold text-base ml-2">My List</Text>
                                 </Pressable>
@@ -589,25 +604,25 @@ export default function DetailScreen() {
                                 </View>
                             </View>
 
-                            {(content as Movie).budget && (content as Movie).budget > 0 ? (
+                            {((content as Movie).budget ?? 0) > 0 ? (
                                 <View className="bg-gray-900/50 p-4 rounded-xl border border-white/5 flex-row items-center justify-between">
                                     <View className="flex-row items-center gap-3">
                                         <View className="w-8 h-8 rounded-full bg-yellow-500/20 items-center justify-center"><DollarSign size={16} color="#EAB308" /></View>
                                         <View>
                                             <Text className="text-gray-400 text-xs uppercase font-bold">Budget</Text>
-                                            <Text className="text-white font-semibold">${(content as Movie).budget?.toLocaleString()}</Text>
+                                            <Text className="text-white font-semibold">${(content as Movie).budget!.toLocaleString()}</Text>
                                         </View>
                                     </View>
                                 </View>
                             ) : null}
 
-                            {(content as Movie).revenue && (content as Movie).revenue > 0 ? (
+                            {((content as Movie).revenue ?? 0) > 0 ? (
                                 <View className="bg-gray-900/50 p-4 rounded-xl border border-white/5 flex-row items-center justify-between">
                                     <View className="flex-row items-center gap-3">
                                         <View className="w-8 h-8 rounded-full bg-green-500/20 items-center justify-center"><Wallet size={16} color="#22C55E" /></View>
                                         <View>
                                             <Text className="text-gray-400 text-xs uppercase font-bold">Revenue</Text>
-                                            <Text className="text-white font-semibold">${(content as Movie).revenue?.toLocaleString()}</Text>
+                                            <Text className="text-white font-semibold">${(content as Movie).revenue!.toLocaleString()}</Text>
                                         </View>
                                     </View>
                                 </View>
