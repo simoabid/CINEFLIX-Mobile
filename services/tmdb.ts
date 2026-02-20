@@ -1036,307 +1036,221 @@ export const searchCollections = async (query: string, page: number = 1): Promis
 };
 
 // Efficient Collection Discovery - Gets fresh collections without overwhelming API
+
+// Lightweight collection details - just 1 API call per collection (no per-film detail fetching)
+// Used for list views where we don't need exact runtimes
+export const getCollectionDetailsLight = async (collectionId: number): Promise<CollectionDetails | null> => {
+  try {
+    const response = await tmdbApi.get(`/collection/${collectionId}`);
+    const collection = response.data;
+
+    const sortedFilms = [...(collection.parts || [])].sort((a: Movie, b: Movie) =>
+      new Date(a.release_date || '').getTime() - new Date(b.release_date || '').getTime()
+    );
+
+    const firstReleaseDate = sortedFilms[0]?.release_date || '';
+    const latestReleaseDate = sortedFilms[sortedFilms.length - 1]?.release_date || '';
+
+    // Estimate runtime: ~120 min per film (avoids N extra API calls)
+    const estimatedRuntime = sortedFilms.length * 120;
+
+    return {
+      ...collection,
+      parts: sortedFilms,
+      film_count: sortedFilms.length,
+      total_runtime: estimatedRuntime,
+      first_release_date: firstReleaseDate,
+      latest_release_date: latestReleaseDate,
+      type: classifyCollectionType(sortedFilms.length),
+      status: determineCollectionStatus(sortedFilms),
+      genre_categories: extractGenreCategories(sortedFilms),
+      studio: extractStudio(sortedFilms),
+    };
+  } catch (error) {
+    // Silently skip failed collections
+    return null;
+  }
+};
+
+// Well-known TMDB collection IDs — curated for instant discovery
+const CURATED_COLLECTION_IDS: number[] = [
+  // Superhero / Marvel / DC
+  529892, // Marvel Cinematic Universe (Avengers)
+  131296, // Spider-Man Collection
+  86311,  // Guardians of the Galaxy
+  284433, // X-Men Collection
+  263,    // The Dark Knight Collection
+  748,    // Superman Collection
+  9485,   // Fast & Furious Collection
+  2980,   // Deadpool Collection
+
+  // Iconic Franchises
+  10,     // Star Wars Collection
+  1241,   // Harry Potter Collection
+  119,    // Lord of the Rings Collection
+  121938, // The Hobbit Collection
+  2344,   // Matrix Collection
+  115776, // Hunger Games Collection
+  87359,  // Mission: Impossible Collection
+  404609, // John Wick Collection
+  295,    // Pirates of the Caribbean Collection
+  328,    // Jurassic Park Collection
+  8945,   // Batman (Burton/Schumacher) Collection
+  645,    // James Bond Collection
+
+  // Animation / Family
+  10194,  // Toy Story Collection
+  2150,   // Shrek Collection
+  33514,  // Despicable Me Collection
+  137697, // Finding Nemo Collection
+  87118,  // How to Train Your Dragon Collection
+  420,    // The Lion King Collection
+  386382, // Frozen Collection
+  284,    // Incredibles Collection
+  93791,  // Kung Fu Panda Collection
+  264,    // Cars Collection
+  2980,   // Madagascar Collection
+
+  // Horror
+  2467,   // Conjuring Collection
+  656,    // Saw Collection
+  2980,   // Insidious Collection
+  91697,  // IT Collection
+
+  // Sci-Fi
+  135416, // Planet of the Apes (Reboot) Collection
+  115575, // Star Trek (Kelvin) Collection
+  34055,  // Alien Collection
+  528,    // Terminator Collection
+  256322, // Maze Runner Collection
+
+  // Action / Adventure
+  1570,   // Die Hard Collection
+  86066,  // Expendables Collection
+  495,    // Transformers Collection
+  468552, // Wonder Woman Collection
+  173710, // Divergent Collection
+  748,    // Rocky Collection
+  84,     // Indiana Jones Collection
+  8650,   // Bourne Collection
+
+  // Drama / Other
+  1733,   // The Mummy Collection
+  735,    // Godfather Collection
+  126125, // Taken Collection
+  1582,   // Hangover Collection
+  230,    // The Twilight Saga
+  2326,   // Ocean's Collection
+  1709,   // Night at the Museum Collection
+  1657,   // 300 Collection
+];
+
 export const discoverAllCollections = async (
   maxCollections: number = 200,
   forceRefresh: boolean = false,
   progressCallback?: (progress: { scanned: number; found: number; step: string }) => void
 ): Promise<CollectionDetails[]> => {
-  // Return cached data if valid and not forcing refresh
+  // Return cached data if valid
   if (!forceRefresh && isCacheValid(discoveryCache.lastFetched) && discoveryCache.collections.length > 0) {
-    console.log(`✅ Returning ${discoveryCache.collections.length} cached collections (fast load)`);
     if (progressCallback) {
       progressCallback({
         scanned: discoveryCache.collections.length,
         found: discoveryCache.collections.length,
-        step: `✅ Loaded ${discoveryCache.collections.length} cached collections`
+        step: `✅ Loaded ${discoveryCache.collections.length} collections`
       });
     }
     return discoveryCache.collections.slice(0, maxCollections);
   }
 
-  // Only clear cache if we're forcing refresh
-  if (forceRefresh) {
-    clearCollectionsCache();
-  }
+  if (forceRefresh) clearCollectionsCache();
 
   try {
-    console.log('🚀 Starting lightning-fast collection discovery from TMDB...');
-    const discoveredCollections = new Map<number, CollectionDetails>();
-    let totalMoviesScanned = 0;
+    if (progressCallback) {
+      progressCallback({ scanned: 0, found: 0, step: '⚡ Fetching collections...' });
+    }
 
-    const updateProgress = (step: string) => {
-      discoveryCache.discoveryProgress = {
-        moviesScanned: totalMoviesScanned,
-        collectionsFound: discoveredCollections.size,
-        currentStep: step
-      };
+    // Deduplicate IDs
+    const uniqueIds = [...new Set(CURATED_COLLECTION_IDS)];
+
+    // Fetch all collections in parallel batches of 10
+    const BATCH_SIZE = 10;
+    const allCollections: CollectionDetails[] = [];
+
+    for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+      const batch = uniqueIds.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(id => getCollectionDetailsLight(id))
+      );
+
+      for (const col of results) {
+        if (col && col.film_count >= 2) {
+          allCollections.push(col);
+        }
+      }
+
       if (progressCallback) {
         progressCallback({
-          scanned: totalMoviesScanned,
-          found: discoveredCollections.size,
-          step: step
+          scanned: Math.min(i + BATCH_SIZE, uniqueIds.length),
+          found: allCollections.length,
+          step: `⚡ Loading collections... (${allCollections.length} found)`
         });
       }
-    };
+    }
 
-    // Add timeout to prevent infinite loading
-    const discoveryTimeout = new Promise<void>((_, reject) => {
-      setTimeout(() => reject(new Error('Discovery timeout - using fallback')), 45000); // 45 second timeout
-    });
-
-    const discoveryProcess = async () => {
-      // Step 1: Fast movie scan (optimized)
-      updateProgress('⚡ Quick scan of popular movies...');
-      await efficientMovieScan(discoveredCollections, updateProgress, (scanned) => {
-        totalMoviesScanned = scanned;
-      });
-
-      // Step 2: Essential franchise search
-      updateProgress('🔍 Finding major franchises...');
-      await targetedFranchiseSearch(discoveredCollections, updateProgress);
-
-      // Step 3: Key genre sampling
-      updateProgress('🎭 Sampling top genres...');
-      await quickGenreSampling(discoveredCollections, updateProgress);
-    };
-
-    // Race between discovery and timeout
-    await Promise.race([discoveryProcess(), discoveryTimeout]);
-
-    const allCollections = Array.from(discoveredCollections.values())
-      .filter(collection => collection && collection.film_count >= 2)
-      .sort((a, b) => b.film_count - a.film_count);
+    // Sort by film count (biggest franchises first)
+    allCollections.sort((a, b) => b.film_count - a.film_count);
 
     // Update cache
     discoveryCache.collections = allCollections;
     discoveryCache.lastFetched = Date.now();
 
-    updateProgress(`✅ Lightning discovery complete! Found ${allCollections.length} collections`);
-    console.log(`🎉 Successfully discovered ${allCollections.length} collections in record time!`);
+    if (progressCallback) {
+      progressCallback({
+        scanned: uniqueIds.length,
+        found: allCollections.length,
+        step: `✅ Loaded ${allCollections.length} collections`
+      });
+    }
 
     return allCollections.slice(0, maxCollections);
 
   } catch (error: any) {
-    console.error('❌ Error in collection discovery:', error);
-
-    // Check if it's a timeout error
-    if (error.message?.includes('timeout')) {
-      console.log('⏱️ Discovery timed out, using backup method for reliability');
-      if (progressCallback) {
-        progressCallback({
-          scanned: 0,
-          found: 0,
-          step: 'ℹ️ Switching to backup discovery method...'
-        });
-      }
-    } else {
-      if (progressCallback) {
-        progressCallback({
-          scanned: 0,
-          found: 0,
-          step: '❌ Discovery failed, trying backup method...'
-        });
-      }
+    console.error('Error fetching collections:', error);
+    if (progressCallback) {
+      progressCallback({ scanned: 0, found: 0, step: `❌ Error: ${error?.message}` });
     }
-
-    // Fallback to basic discovery (fast and reliable)
-    return await basicCollectionDiscovery(maxCollections, progressCallback);
+    return [];
   }
 };
 
-// Fast movie scan - optimized for speed
+// Fast movie scan - kept for compatibility but no longer used by discoverAllCollections
 const efficientMovieScan = async (
   collectionsMap: Map<number, CollectionDetails>,
   updateProgress: (step: string) => void,
   updateScanned: (scanned: number) => void
 ): Promise<void> => {
-  const endpoints = [
-    { name: 'Popular Movies', endpoint: '/movie/popular' },
-    { name: 'Trending Movies', endpoint: '/trending/movie/week' }
-  ];
-
-  let totalScanned = 0;
-
-  for (const { name, endpoint } of endpoints) {
-    updateProgress(`Scanning ${name}...`);
-
-    try {
-      const response = await tmdbApi.get(endpoint, { params: { page: 1 } });
-      const movies = response.data.results?.slice(0, 10) || []; // Only first 10 movies for speed
-
-      for (const movie of movies) {
-        try {
-          const movieDetails = await getMovieDetails(movie.id);
-          totalScanned++;
-          updateScanned(totalScanned);
-
-          if (movieDetails?.belongs_to_collection && !collectionsMap.has(movieDetails.belongs_to_collection.id)) {
-            const collection = await getCollectionDetails(movieDetails.belongs_to_collection.id);
-            if (collection && collection.film_count >= 2) {
-              collectionsMap.set(collection.id, collection);
-              console.log(`🎬 Found collection: ${collection.name} (${collection.film_count} films)`);
-            }
-          }
-
-          await delay(RATE_LIMIT_DELAY);
-        } catch (error) {
-          // Skip individual movie errors
-        }
-      }
-
-      await delay(50); // Reduced delay between endpoints
-    } catch (error) {
-      console.warn(`Error scanning ${name}:`, error);
-    }
-  }
+  // No-op: replaced by curated ID approach
 };
 
-// Fast franchise search - only essential franchises
 const targetedFranchiseSearch = async (
   collectionsMap: Map<number, CollectionDetails>,
   updateProgress: (step: string) => void
 ): Promise<void> => {
-  const essentialFranchises = [
-    'Marvel', 'Star Wars', 'Harry Potter', 'Fast Furious', 'Batman',
-    'Lord of the Rings', 'Jurassic', 'Toy Story', 'Shrek', 'Matrix'
-  ];
-
-  for (const franchise of essentialFranchises) {
-    updateProgress(`Searching for ${franchise}...`);
-
-    try {
-      const searchResponse = await searchCollections(franchise);
-      if (searchResponse?.results) {
-        for (const collection of searchResponse.results.slice(0, 1)) { // Only top result
-          if (!collectionsMap.has(collection.id)) {
-            const detailedCollection = await getCollectionDetails(collection.id);
-            if (detailedCollection && detailedCollection.film_count >= 2) {
-              collectionsMap.set(collection.id, detailedCollection);
-              console.log(`🔍 Found franchise: ${detailedCollection.name}`);
-            }
-          }
-          await delay(50); // Reduced delay
-        }
-      }
-      await delay(30); // Reduced delay between franchises
-    } catch (error) {
-      console.warn(`Search failed for ${franchise}:`, error);
-    }
-  }
+  // No-op: replaced by curated ID approach
 };
 
-// Minimal genre sampling - fastest discovery
 const quickGenreSampling = async (
   collectionsMap: Map<number, CollectionDetails>,
   updateProgress: (step: string) => void
 ): Promise<void> => {
-  const topGenres = [
-    { id: 28, name: 'Action' },
-    { id: 16, name: 'Animation' },
-    { id: 14, name: 'Fantasy' },
-    { id: 27, name: 'Horror' }
-  ];
-
-  for (const genre of topGenres) {
-    updateProgress(`Sampling ${genre.name} collections...`);
-
-    try {
-      const response = await tmdbApi.get('/discover/movie', {
-        params: {
-          with_genres: genre.id,
-          sort_by: 'popularity.desc',
-          page: 1
-        }
-      });
-
-      const movies = response.data.results?.slice(0, 5) || []; // Only 5 movies per genre
-
-      for (const movie of movies) {
-        try {
-          const movieDetails = await getMovieDetails(movie.id);
-          if (movieDetails?.belongs_to_collection && !collectionsMap.has(movieDetails.belongs_to_collection.id)) {
-            const collection = await getCollectionDetails(movieDetails.belongs_to_collection.id);
-            if (collection && collection.film_count >= 2) {
-              collectionsMap.set(collection.id, collection);
-              console.log(`🎭 Found ${genre.name} collection: ${collection.name}`);
-            }
-          }
-          await delay(50); // Reduced delay
-        } catch (error) {
-          // Skip individual errors
-        }
-      }
-
-      await delay(30); // Reduced delay between genres
-    } catch (error) {
-      console.warn(`Error sampling ${genre.name} collections:`, error);
-    }
-  }
+  // No-op: replaced by curated ID approach
 };
 
-// Basic collection discovery fallback - minimal API calls
 const basicCollectionDiscovery = async (
   maxCollections: number,
   progressCallback?: (progress: { scanned: number; found: number; step: string }) => void
 ): Promise<CollectionDetails[]> => {
-  const collections: CollectionDetails[] = [];
-
-  try {
-    if (progressCallback) {
-      progressCallback({ scanned: 0, found: 0, step: 'Using backup discovery method...' });
-    }
-
-    // Just get collections from popular movies - minimal approach
-    const response = await tmdbApi.get('/movie/popular');
-    const movies = response.data.results?.slice(0, 15) || []; // Reduced to 15 movies
-
-    let scanned = 0;
-    for (const movie of movies) {
-      try {
-        const movieDetails = await getMovieDetails(movie.id);
-        scanned++;
-
-        if (movieDetails?.belongs_to_collection) {
-          const collection = await getCollectionDetails(movieDetails.belongs_to_collection.id);
-          if (collection && collection.film_count >= 2) {
-            const exists = collections.find(c => c.id === collection.id);
-            if (!exists) {
-              collections.push(collection);
-              console.log(`🎬 Basic discovery found: ${collection.name}`);
-            }
-          }
-        }
-
-        if (progressCallback) {
-          progressCallback({
-            scanned,
-            found: collections.length,
-            step: `Found ${collections.length} collections...`
-          });
-        }
-
-        await delay(50); // Reduced delay
-
-        if (collections.length >= maxCollections) break;
-      } catch (error) {
-        // Skip individual errors
-      }
-    }
-
-    if (progressCallback) {
-      progressCallback({
-        scanned,
-        found: collections.length,
-        step: `✅ Backup method found ${collections.length} collections`
-      });
-    }
-
-    return collections.sort((a, b) => b.film_count - a.film_count);
-
-  } catch (error) {
-    console.error('❌ Even basic discovery failed:', error);
-    return [];
-  }
+  return discoverAllCollections(maxCollections, true, progressCallback);
 };
 
 

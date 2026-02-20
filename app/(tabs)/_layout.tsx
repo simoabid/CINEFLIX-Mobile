@@ -49,7 +49,7 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="account"
                 options={{
-                    title: "My Netflix",
+                    title: "My Account",
                     tabBarIcon: ({ color, size }) => <User color={color} size={size} />
                 }}
             />
