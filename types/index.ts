@@ -305,6 +305,28 @@ export type CollectionType =
 
 export type CollectionStatus = 'complete' | 'ongoing' | 'incomplete';
 
+export interface CollectionCategory {
+    id: string;
+    name: string;
+    description: string;
+    collections: CollectionDetails[];
+    icon?: string;
+}
+
+export interface FranchiseFilter {
+    genre?: string[];
+    type?: CollectionType[];
+    status?: CollectionStatus[];
+    studio?: string[];
+    completion?: 'all' | 'completed' | 'in_progress' | 'not_started';
+    length?: 'trilogy' | 'quadrilogy' | 'extended' | 'all';
+}
+
+export interface ViewingOrder {
+    type: 'release' | 'chronological';
+    films: Movie[];
+    description: string;
+}
 
 // New Types for Watch Service & Downloads
 

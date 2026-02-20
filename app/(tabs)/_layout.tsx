@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { View } from "react-native";
-import { Home, Search, List, User } from "lucide-react-native";
+import { Home, Search, List, User, Film } from "lucide-react-native";
 
 export default function TabsLayout() {
     return (
@@ -26,17 +26,24 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="my-list"
-                options={{
-                    title: "My List",
-                    tabBarIcon: ({ color, size }) => <List color={color} size={size} />
-                }}
-            />
-            <Tabs.Screen
                 name="search"
                 options={{
                     title: "Search",
                     tabBarIcon: ({ color, size }) => <Search color={color} size={size} />
+                }}
+            />
+            <Tabs.Screen
+                name="collections"
+                options={{
+                    title: "Collections",
+                    tabBarIcon: ({ color, size }) => <Film color={color} size={size} />
+                }}
+            />
+            <Tabs.Screen
+                name="my-list"
+                options={{
+                    title: "My List",
+                    tabBarIcon: ({ color, size }) => <List color={color} size={size} />
                 }}
             />
             <Tabs.Screen
