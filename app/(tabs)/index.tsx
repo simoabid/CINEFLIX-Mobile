@@ -413,7 +413,7 @@ export default function HomeScreen() {
 
                             {/* Gradients */}
                             <LinearGradient
-                                colors={['transparent', 'rgba(20,20,20,0.5)', 'rgba(20,20,20,0.95)', '#141414']}
+                                colors={['transparent', 'rgba(10,10,31,0.5)', 'rgba(10,10,31,0.95)', '#0A0A1F']}
                                 locations={[0, 0.3, 0.7, 1]}
                                 className="absolute bottom-0 w-full h-full"
                             />

@@ -87,7 +87,7 @@ const LongPressPreviewModal: React.FC<LongPressPreviewModalProps> = ({
                     <Animated.View
                         entering={SlideInDown.springify().damping(20).stiffness(200)}
                         exiting={SlideOutDown.duration(200)}
-                        className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-white/10"
+                        className="bg-[#1A1A2E] rounded-2xl overflow-hidden border border-white/10"
                         style={{
                             width: MODAL_WIDTH,
                             maxHeight: SCREEN_HEIGHT * 0.8,

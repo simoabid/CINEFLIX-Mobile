@@ -329,7 +329,7 @@ export default function DetailScreen() {
 
                     {/* Gradient blend to background */}
                     <LinearGradient
-                        colors={['transparent', '#141414']}
+                        colors={['transparent', '#0A0A1F']}
                         locations={[0, 1]}
                         className="absolute bottom-0 w-full h-24"
                         pointerEvents="none"

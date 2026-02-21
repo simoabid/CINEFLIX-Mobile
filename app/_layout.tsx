@@ -11,13 +11,13 @@ export default function RootLayout() {
                 <Stack
                     screenOptions={{
                         headerShown: false,
-                        contentStyle: { backgroundColor: '#141414' },
+                        contentStyle: { backgroundColor: '#0A0A1F' },
                         animation: 'fade'
                     }}
                 >
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 </Stack>
-                <StatusBar style="light" backgroundColor="#141414" />
+                <StatusBar style="light" backgroundColor="#0A0A1F" />
             </View>
         </SafeAreaProvider>
     );

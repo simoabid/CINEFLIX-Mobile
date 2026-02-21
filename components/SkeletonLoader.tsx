@@ -130,7 +130,7 @@ export const HeroSkeleton: React.FC = () => {
 
             {/* Gradient Overlay */}
             <LinearGradient
-                colors={['transparent', 'rgba(20,20,20,0.4)', 'rgba(20,20,20,0.95)', '#141414']}
+                colors={['transparent', 'rgba(10,10,31,0.4)', 'rgba(10,10,31,0.95)', '#0A0A1F']}
                 locations={[0, 0.5, 0.85, 1]}
                 className="absolute bottom-0 w-full h-full"
             />
@@ -232,7 +232,7 @@ export const DetailSkeleton: React.FC = () => {
                 </View>
 
                 <LinearGradient
-                    colors={['transparent', 'rgba(20,20,20,0.8)', '#141414']}
+                    colors={['transparent', 'rgba(10,10,31,0.8)', '#0A0A1F']}
                     locations={[0, 0.7, 1]}
                     className="absolute bottom-0 w-full h-full"
                 />
@@ -326,7 +326,7 @@ export const PersonSkeleton: React.FC = () => {
                 </View>
 
                 <LinearGradient
-                    colors={['transparent', 'rgba(20,20,20,0.8)', '#141414']}
+                    colors={['transparent', 'rgba(10,10,31,0.8)', '#0A0A1F']}
                     locations={[0, 0.7, 1]}
                     className="absolute bottom-0 w-full h-full"
                 />

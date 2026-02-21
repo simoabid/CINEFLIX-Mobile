@@ -10,7 +10,7 @@ export default function WelcomeScreen() {
         <View className="flex-1 bg-netflix-black justify-center items-center relative">
             {/* Background Gradient Effect */}
             <LinearGradient
-                colors={['rgba(20,20,20,0.5)', 'rgba(20,20,20,0.9)', '#141414']}
+                colors={['rgba(10,10,31,0.5)', 'rgba(10,10,31,0.9)', '#0A0A1F']}
                 className="absolute w-full h-full z-0"
             />
 

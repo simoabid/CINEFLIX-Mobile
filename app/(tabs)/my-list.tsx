@@ -63,7 +63,7 @@ export default function MyListScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-[#141414] pt-2" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-[#0A0A1F] pt-2" edges={['top']}>
             <View className="px-4 mb-4 mt-2 flex-row items-center justify-between">
                 <Text className="text-white text-2xl font-bold">My List</Text>
             </View>

@@ -89,7 +89,7 @@ export default function PersonDetailScreen() {
                     )}
 
                     <LinearGradient
-                        colors={['transparent', '#141414']}
+                        colors={['transparent', '#0A0A1F']}
                         locations={[0.6, 1]}
                         className="absolute bottom-0 w-full h-full"
                     />
