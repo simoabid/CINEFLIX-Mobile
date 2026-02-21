@@ -41,11 +41,11 @@
 <td align="center"><strong>🎥 Detail</strong></td>
 </tr>
 <tr>
-<td><img src="https://placehold.co/180x380/0A0A1F/E50914?text=Home" alt="Home"/></td>
-<td><img src="https://placehold.co/180x380/0A0A1F/E50914?text=Collections" alt="Collections"/></td>
-<td><img src="https://placehold.co/180x380/0A0A1F/E50914?text=Search" alt="Search"/></td>
-<td><img src="https://placehold.co/180x380/0A0A1F/E50914?text=My+List" alt="My List"/></td>
-<td><img src="https://placehold.co/180x380/0A0A1F/E50914?text=Detail" alt="Detail"/></td>
+<td><img src="assets/screenshots/home.jpg" alt="Home"/></td>
+<td><img src="assets/screenshots/collections.jpg" alt="Collections"/></td>
+<td><img src="assets/screenshots/search.jpg" alt="Search"/></td>
+<td><img src="assets/screenshots/mylist.jpg" alt="My List"/></td>
+<td><img src="assets/screenshots/account.jpg" alt="Detail"/></td>
 </tr>
 </table>
 
@@ -501,9 +501,9 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 
 <br/>
 
-[![GitHub Stars](https://img.shields.io/github/stars/yourusername/cineflix-mobile?style=social)](https://github.com/yourusername/cineflix-mobile)
+[![GitHub Stars](https://img.shields.io/github/stars/simoabid/cineflix-mobile?style=social)](https://github.com/simoabid/cineflix-mobile)
 &nbsp;&nbsp;
-[![Follow](https://img.shields.io/github/followers/yourusername?style=social)](https://github.com/yourusername)
+[![Follow](https://img.shields.io/github/followers/simoabid?style=social)](https://github.com/simoabid)
 
 <br/>
 
