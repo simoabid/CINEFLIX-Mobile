@@ -8,15 +8,13 @@ interface FilterChipsProps {
 }
 
 export default function FilterChips({ categories, selected, onSelect }: FilterChipsProps) {
-    const allCategories = [{ id: 'all', name: 'All' }, ...categories];
-
     return (
         <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.container}
         >
-            {allCategories.map((cat) => {
+            {categories.map((cat) => {
                 const isActive = selected === cat.id;
                 return (
                     <TouchableOpacity

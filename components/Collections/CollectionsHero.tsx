@@ -107,13 +107,15 @@ export default function CollectionsHero({ collection, onStartMarathon, onViewCol
                             <Clock size={14} color="#9CA3AF" />
                             <Text style={styles.statText}>{formatRuntime(collection.total_runtime)}</Text>
                         </View>
-                        {firstYear && lastYear && (
+                    </View>
+                    {firstYear && lastYear && (
+                        <View style={styles.statsRow}>
                             <View style={styles.stat}>
                                 <Calendar size={14} color="#9CA3AF" />
                                 <Text style={styles.statText}>{firstYear}-{lastYear}</Text>
                             </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
 
                     {/* Genre pills */}
                     <View style={styles.genresRow}>
@@ -129,7 +131,7 @@ export default function CollectionsHero({ collection, onStartMarathon, onViewCol
                         <TouchableOpacity style={styles.ctaPrimary} onPress={onStartMarathon} activeOpacity={0.8}>
                             <Play size={18} color="#fff" fill="#fff" />
                             <Text style={styles.ctaPrimaryText}>
-                                {progress > 0 ? 'Continue Marathon' : 'Start Marathon'}
+                                {progress > 0 ? 'Continue' : 'Start'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.ctaSecondary} onPress={onViewCollection} activeOpacity={0.8}>

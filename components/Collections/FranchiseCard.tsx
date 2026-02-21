@@ -5,8 +5,7 @@ import { Play, Clock, Calendar, Film, Star } from 'lucide-react-native';
 import { CollectionDetails } from '../../types';
 import { getBackdropUrl, getPosterUrl } from '../../services/tmdb';
 
-const CARD_WIDTH = Dimensions.get('window').width * 0.72;
-const CARD_HEIGHT = 320;
+const CARD_HEIGHT = 300;
 
 interface FranchiseCardProps {
     collection: CollectionDetails;
@@ -118,13 +117,15 @@ export default function FranchiseCard({ collection, onPress }: FranchiseCardProp
                         <Clock size={12} color="#9CA3AF" />
                         <Text style={styles.statText}>{formatRuntime(collection.total_runtime)}</Text>
                     </View>
-                    {firstYear && lastYear && (
+                </View>
+                {firstYear && lastYear && (
+                    <View style={styles.statsRow}>
                         <View style={styles.stat}>
                             <Calendar size={12} color="#9CA3AF" />
                             <Text style={styles.statText}>{firstYear}-{lastYear}</Text>
                         </View>
-                    )}
-                </View>
+                    </View>
+                )}
 
                 {/* Progress */}
                 {progress > 0 && (
@@ -174,15 +175,14 @@ export default function FranchiseCard({ collection, onPress }: FranchiseCardProp
 
 const styles = StyleSheet.create({
     card: {
-        width: CARD_WIDTH,
+        width: '100%',
         backgroundColor: '#1A1A2E',
         borderRadius: 14,
         overflow: 'hidden',
-        marginRight: 14,
     },
     imageContainer: {
-        width: CARD_WIDTH,
-        height: 170,
+        width: '100%',
+        height: 150,
         position: 'relative',
         overflow: 'hidden',
     },

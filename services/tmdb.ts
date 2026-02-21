@@ -1035,10 +1035,56 @@ export const searchCollections = async (query: string, page: number = 1): Promis
   }
 };
 
-// Efficient Collection Discovery - Gets fresh collections without overwhelming API
+// ============================================================
+// Collection Discovery — Paginated, Infinite Scroll, Genre Filter
+// ============================================================
 
-// Lightweight collection details - just 1 API call per collection (no per-film detail fetching)
-// Used for list views where we don't need exact runtimes
+// Genre IDs for collection category filters
+export const COLLECTION_GENRE_MAP: Record<string, number> = {
+  action: 28,
+  animation: 16,
+  comedy: 35,
+  crime: 80,
+  drama: 18,
+  fantasy: 14,
+  horror: 27,
+  romance: 10749,
+  scifi: 878,
+  thriller: 53,
+  adventure: 12,
+  family: 10751,
+  mystery: 9648,
+  war: 10752,
+  western: 37,
+};
+
+export const COLLECTION_FILTER_OPTIONS = [
+  { id: 'all', name: 'All', icon: '🎬' },
+  { id: 'action', name: 'Action', icon: '💥' },
+  { id: 'scifi', name: 'Sci-Fi', icon: '🚀' },
+  { id: 'fantasy', name: 'Fantasy', icon: '🧙' },
+  { id: 'horror', name: 'Horror', icon: '👻' },
+  { id: 'animation', name: 'Animation', icon: '🎨' },
+  { id: 'comedy', name: 'Comedy', icon: '😂' },
+  { id: 'drama', name: 'Drama', icon: '🎭' },
+  { id: 'adventure', name: 'Adventure', icon: '🗺️' },
+  { id: 'thriller', name: 'Thriller', icon: '🔪' },
+  { id: 'crime', name: 'Crime', icon: '🔫' },
+  { id: 'family', name: 'Family', icon: '👨‍👩‍👧‍👦' },
+  { id: 'romance', name: 'Romance', icon: '💕' },
+  { id: 'war', name: 'War', icon: '⚔️' },
+  { id: 'western', name: 'Western', icon: '🤠' },
+  { id: 'mystery', name: 'Mystery', icon: '🔍' },
+];
+
+// Tracks already-seen collection IDs across pages to avoid duplicates
+let seenCollectionIds = new Set<number>();
+
+export const resetSeenCollections = () => {
+  seenCollectionIds = new Set<number>();
+};
+
+// Lightweight collection details — 1 API call, no per-film detail fetching
 export const getCollectionDetailsLight = async (collectionId: number): Promise<CollectionDetails | null> => {
   try {
     const response = await tmdbApi.get(`/collection/${collectionId}`);
@@ -1050,8 +1096,6 @@ export const getCollectionDetailsLight = async (collectionId: number): Promise<C
 
     const firstReleaseDate = sortedFilms[0]?.release_date || '';
     const latestReleaseDate = sortedFilms[sortedFilms.length - 1]?.release_date || '';
-
-    // Estimate runtime: ~120 min per film (avoids N extra API calls)
     const estimatedRuntime = sortedFilms.length * 120;
 
     return {
@@ -1066,85 +1110,66 @@ export const getCollectionDetailsLight = async (collectionId: number): Promise<C
       genre_categories: extractGenreCategories(sortedFilms),
       studio: extractStudio(sortedFilms),
     };
-  } catch (error) {
-    // Silently skip failed collections
+  } catch {
     return null;
   }
 };
 
-// Well-known TMDB collection IDs — curated for instant discovery
-const CURATED_COLLECTION_IDS: number[] = [
-  // Superhero / Marvel / DC
-  529892, // Marvel Cinematic Universe (Avengers)
-  131296, // Spider-Man Collection
-  86311,  // Guardians of the Galaxy
-  284433, // X-Men Collection
-  263,    // The Dark Knight Collection
-  748,    // Superman Collection
-  9485,   // Fast & Furious Collection
-  2980,   // Deadpool Collection
+/**
+ * Discover collections from popular movies — paginated, supports genre filter.
+ * Fetches movies from TMDB sorted by popularity, extracts collections, deduplicates.
+ * Each page: 1 discover call + ~20 parallel detail calls + ~5-10 parallel collection calls.
+ */
+export const discoverCollectionsPage = async (
+  page: number = 1,
+  genreId?: number,
+): Promise<{ collections: CollectionDetails[]; hasMore: boolean }> => {
+  try {
+    const params: any = { page, sort_by: 'popularity.desc' };
+    if (genreId) params.with_genres = genreId;
 
-  // Iconic Franchises
-  10,     // Star Wars Collection
-  1241,   // Harry Potter Collection
-  119,    // Lord of the Rings Collection
-  121938, // The Hobbit Collection
-  2344,   // Matrix Collection
-  115776, // Hunger Games Collection
-  87359,  // Mission: Impossible Collection
-  404609, // John Wick Collection
-  295,    // Pirates of the Caribbean Collection
-  328,    // Jurassic Park Collection
-  8945,   // Batman (Burton/Schumacher) Collection
-  645,    // James Bond Collection
+    const response = await tmdbApi.get('/discover/movie', { params });
+    const movies: Movie[] = response.data.results || [];
+    const totalPages = Math.min(response.data.total_pages || 1, 500); // TMDB caps at 500
 
-  // Animation / Family
-  10194,  // Toy Story Collection
-  2150,   // Shrek Collection
-  33514,  // Despicable Me Collection
-  137697, // Finding Nemo Collection
-  87118,  // How to Train Your Dragon Collection
-  420,    // The Lion King Collection
-  386382, // Frozen Collection
-  284,    // Incredibles Collection
-  93791,  // Kung Fu Panda Collection
-  264,    // Cars Collection
-  2980,   // Madagascar Collection
+    // Fetch movie details in parallel to find belongs_to_collection
+    const movieDetails = await Promise.all(
+      movies.map(m => tmdbApi.get(`/movie/${m.id}`).then(r => r.data).catch(() => null))
+    );
 
-  // Horror
-  2467,   // Conjuring Collection
-  656,    // Saw Collection
-  2980,   // Insidious Collection
-  91697,  // IT Collection
+    // Extract unique, unseen collection IDs
+    const newCollectionIds: number[] = [];
+    for (const movie of movieDetails) {
+      if (movie?.belongs_to_collection) {
+        const colId = movie.belongs_to_collection.id;
+        if (!seenCollectionIds.has(colId)) {
+          seenCollectionIds.add(colId);
+          newCollectionIds.push(colId);
+        }
+      }
+    }
 
-  // Sci-Fi
-  135416, // Planet of the Apes (Reboot) Collection
-  115575, // Star Trek (Kelvin) Collection
-  34055,  // Alien Collection
-  528,    // Terminator Collection
-  256322, // Maze Runner Collection
+    // Fetch collection details in parallel (lightweight)
+    const results = await Promise.all(
+      newCollectionIds.map(id => getCollectionDetailsLight(id))
+    );
 
-  // Action / Adventure
-  1570,   // Die Hard Collection
-  86066,  // Expendables Collection
-  495,    // Transformers Collection
-  468552, // Wonder Woman Collection
-  173710, // Divergent Collection
-  748,    // Rocky Collection
-  84,     // Indiana Jones Collection
-  8650,   // Bourne Collection
+    const collections = results.filter(
+      (c): c is CollectionDetails => c !== null && c.film_count >= 2
+    );
 
-  // Drama / Other
-  1733,   // The Mummy Collection
-  735,    // Godfather Collection
-  126125, // Taken Collection
-  1582,   // Hangover Collection
-  230,    // The Twilight Saga
-  2326,   // Ocean's Collection
-  1709,   // Night at the Museum Collection
-  1657,   // 300 Collection
-];
+    return { collections, hasMore: page < totalPages };
+  } catch (error) {
+    console.error(`discoverCollectionsPage(${page}) error:`, error);
+    return { collections: [], hasMore: false };
+  }
+};
 
+/**
+ * Initial fast load — fetches first 3 pages of popular movies in parallel,
+ * extracts collections, returns them sorted by popularity.
+ * Much faster than the old scanning approach (~2-3 seconds).
+ */
 export const discoverAllCollections = async (
   maxCollections: number = 200,
   forceRefresh: boolean = false,
@@ -1162,38 +1187,30 @@ export const discoverAllCollections = async (
     return discoveryCache.collections.slice(0, maxCollections);
   }
 
-  if (forceRefresh) clearCollectionsCache();
+  if (forceRefresh) {
+    clearCollectionsCache();
+    resetSeenCollections();
+  }
 
   try {
     if (progressCallback) {
-      progressCallback({ scanned: 0, found: 0, step: '⚡ Fetching collections...' });
+      progressCallback({ scanned: 0, found: 0, step: '⚡ Fetching popular collections...' });
     }
 
-    // Deduplicate IDs
-    const uniqueIds = [...new Set(CURATED_COLLECTION_IDS)];
+    // Fetch first 5 pages of popular movies in parallel → extract collections
+    const pages = [1, 2, 3, 4, 5];
+    const pageResults = await Promise.all(
+      pages.map(p => discoverCollectionsPage(p))
+    );
 
-    // Fetch all collections in parallel batches of 10
-    const BATCH_SIZE = 10;
     const allCollections: CollectionDetails[] = [];
-
-    for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
-      const batch = uniqueIds.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(id => getCollectionDetailsLight(id))
-      );
-
-      for (const col of results) {
-        if (col && col.film_count >= 2) {
+    const idSet = new Set<number>();
+    for (const result of pageResults) {
+      for (const col of result.collections) {
+        if (!idSet.has(col.id)) {
+          idSet.add(col.id);
           allCollections.push(col);
         }
-      }
-
-      if (progressCallback) {
-        progressCallback({
-          scanned: Math.min(i + BATCH_SIZE, uniqueIds.length),
-          found: allCollections.length,
-          step: `⚡ Loading collections... (${allCollections.length} found)`
-        });
       }
     }
 
@@ -1206,14 +1223,13 @@ export const discoverAllCollections = async (
 
     if (progressCallback) {
       progressCallback({
-        scanned: uniqueIds.length,
+        scanned: pages.length * 20,
         found: allCollections.length,
         step: `✅ Loaded ${allCollections.length} collections`
       });
     }
 
     return allCollections.slice(0, maxCollections);
-
   } catch (error: any) {
     console.error('Error fetching collections:', error);
     if (progressCallback) {
@@ -1223,28 +1239,22 @@ export const discoverAllCollections = async (
   }
 };
 
-// Fast movie scan - kept for compatibility but no longer used by discoverAllCollections
+// Kept for compatibility
 const efficientMovieScan = async (
   collectionsMap: Map<number, CollectionDetails>,
   updateProgress: (step: string) => void,
   updateScanned: (scanned: number) => void
-): Promise<void> => {
-  // No-op: replaced by curated ID approach
-};
+): Promise<void> => { };
 
 const targetedFranchiseSearch = async (
   collectionsMap: Map<number, CollectionDetails>,
   updateProgress: (step: string) => void
-): Promise<void> => {
-  // No-op: replaced by curated ID approach
-};
+): Promise<void> => { };
 
 const quickGenreSampling = async (
   collectionsMap: Map<number, CollectionDetails>,
   updateProgress: (step: string) => void
-): Promise<void> => {
-  // No-op: replaced by curated ID approach
-};
+): Promise<void> => { };
 
 const basicCollectionDiscovery = async (
   maxCollections: number,

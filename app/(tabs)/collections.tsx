@@ -1,58 +1,184 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
     View,
     Text,
-    ScrollView,
+    FlatList,
     TextInput,
     RefreshControl,
     StyleSheet,
     StatusBar,
     TouchableOpacity,
+    ActivityIndicator,
+    Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Search, X, RefreshCw } from 'lucide-react-native';
 import { CollectionDetails } from '../../types';
 import { useCollections } from '../../services/hooks/useCollections';
 import CollectionsHero from '../../components/Collections/CollectionsHero';
-import CategoryRow from '../../components/Collections/CategoryRow';
+import FranchiseCard from '../../components/Collections/FranchiseCard';
 import FilterChips from '../../components/Collections/FilterChips';
 import CollectionsSkeleton from '../../components/Collections/CollectionsSkeleton';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = (SCREEN_WIDTH - 16 * 2 - 12) / 2; // 2-column grid with gap
 
 export default function CollectionsScreen() {
     const router = useRouter();
     const {
         collections,
-        categories,
         featuredCollection,
         isLoading,
+        isLoadingMore,
         isRefreshing,
         error,
         searchQuery,
-        selectedCategory,
-        stats,
-        discoveryProgress,
+        selectedFilter,
+        hasMore,
+        totalFound,
+        filterOptions,
         fetchCollections,
+        loadMore,
         handleSearch,
-        setSelectedCategory,
+        setSelectedFilter,
         stopHeroRotation,
     } = useCollections();
 
-    const handleCollectionPress = (collection: CollectionDetails) => {
+    const handleCollectionPress = useCallback((collection: CollectionDetails) => {
         stopHeroRotation();
         router.push(`/collection/${collection.id}`);
-    };
+    }, [router, stopHeroRotation]);
 
-    // Filter collections by category if one is selected
-    const displayedCategories = selectedCategory === 'all'
-        ? categories
-        : categories.filter(cat => cat.id === selectedCategory);
+    const handleStartFirstMovie = useCallback((collection: CollectionDetails) => {
+        if (collection.parts?.length) {
+            const sorted = [...collection.parts].sort(
+                (a, b) => new Date(a.release_date || '').getTime() - new Date(b.release_date || '').getTime()
+            );
+            router.push(`/movie/${sorted[0].id}`);
+        }
+    }, [router]);
 
-    if (isLoading && !error) {
+    // FlatList header (hero + search + filters)
+    const ListHeader = useCallback(() => (
+        <View>
+            {/* Hero */}
+            {featuredCollection && !searchQuery && (
+                <CollectionsHero
+                    collection={featuredCollection}
+                    onStartMarathon={() => handleStartFirstMovie(featuredCollection)}
+                    onViewCollection={() => handleCollectionPress(featuredCollection)}
+                />
+            )}
+
+            {/* Search */}
+            <View style={styles.searchContainer}>
+                <View style={styles.searchInputWrapper}>
+                    <Search size={18} color={searchQuery ? '#E50914' : '#6B7280'} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search collections..."
+                        placeholderTextColor="#6B7280"
+                        value={searchQuery}
+                        onChangeText={handleSearch}
+                        returnKeyType="search"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => handleSearch('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <X size={18} color="#6B7280" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+
+            {/* Filter chips */}
+            <FilterChips
+                categories={filterOptions}
+                selected={selectedFilter}
+                onSelect={setSelectedFilter}
+            />
+
+            {/* Results count */}
+            <View style={styles.resultsBar}>
+                <Text style={styles.resultsText}>
+                    {searchQuery
+                        ? `${totalFound} result${totalFound !== 1 ? 's' : ''} for "${searchQuery}"`
+                        : `${totalFound} collections`}
+                </Text>
+                {hasMore && !searchQuery && (
+                    <Text style={styles.scrollHint}>Scroll for more ↓</Text>
+                )}
+            </View>
+        </View>
+    ), [featuredCollection, searchQuery, selectedFilter, totalFound, hasMore, filterOptions, handleCollectionPress, handleSearch, setSelectedFilter]);
+
+    // Render a single grid card (2-column)
+    const renderItem = useCallback(({ item }: { item: CollectionDetails }) => (
+        <View style={styles.gridItem}>
+            <FranchiseCard collection={item} onPress={handleCollectionPress} />
+        </View>
+    ), [handleCollectionPress]);
+
+    // Footer with loading indicator or end message
+    const ListFooter = useCallback(() => {
+        if (isLoadingMore) {
+            return (
+                <View style={styles.footer}>
+                    <ActivityIndicator size="small" color="#E50914" />
+                    <Text style={styles.footerText}>Loading more collections...</Text>
+                </View>
+            );
+        }
+        if (!hasMore && collections.length > 0) {
+            return (
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>
+                        🎬 You've explored {totalFound} collections!
+                    </Text>
+                </View>
+            );
+        }
+        return <View style={{ height: 40 }} />;
+    }, [isLoadingMore, hasMore, totalFound, collections.length]);
+
+    // Empty state
+    const ListEmpty = useCallback(() => {
+        if (isLoading) return null;
+        if (error) {
+            return (
+                <View style={styles.emptyState}>
+                    <Text style={styles.emptyEmoji}>⚠️</Text>
+                    <Text style={styles.emptyTitle}>Something went wrong</Text>
+                    <Text style={styles.emptySubtitle}>{error}</Text>
+                    <TouchableOpacity style={styles.retryButton} onPress={() => fetchCollections(true)}>
+                        <RefreshCw size={16} color="#fff" />
+                        <Text style={styles.retryButtonText}>Try Again</Text>
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+        return (
+            <View style={styles.emptyState}>
+                <Text style={styles.emptyEmoji}>🎬</Text>
+                <Text style={styles.emptyTitle}>No collections found</Text>
+                <Text style={styles.emptySubtitle}>
+                    {searchQuery
+                        ? `No results for "${searchQuery}". Try a different search.`
+                        : 'Try a different filter or pull to refresh.'}
+                </Text>
+                {searchQuery ? (
+                    <TouchableOpacity style={styles.retryButton} onPress={() => handleSearch('')}>
+                        <Text style={styles.retryButtonText}>Clear Search</Text>
+                    </TouchableOpacity>
+                ) : null}
+            </View>
+        );
+    }, [isLoading, error, searchQuery, fetchCollections, handleSearch]);
+
+    if (isLoading && collections.length === 0) {
         return (
             <View style={styles.screen}>
                 <StatusBar barStyle="light-content" />
-                <CollectionsSkeleton progress={discoveryProgress} />
+                <CollectionsSkeleton />
             </View>
         );
     }
@@ -60,8 +186,21 @@ export default function CollectionsScreen() {
     return (
         <View style={styles.screen}>
             <StatusBar barStyle="light-content" />
-            <ScrollView
-                style={styles.scrollView}
+            <FlatList
+                data={collections}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderItem}
+                numColumns={2}
+                columnWrapperStyle={styles.row}
+                ListHeaderComponent={ListHeader}
+                ListFooterComponent={ListFooter}
+                ListEmptyComponent={ListEmpty}
+                onEndReached={() => {
+                    if (hasMore && !isLoadingMore && !searchQuery) {
+                        loadMore();
+                    }
+                }}
+                onEndReachedThreshold={0.5}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
@@ -71,100 +210,8 @@ export default function CollectionsScreen() {
                         colors={['#E50914']}
                     />
                 }
-            >
-                {/* Hero */}
-                {featuredCollection && (
-                    <CollectionsHero
-                        collection={featuredCollection}
-                        onStartMarathon={() => handleCollectionPress(featuredCollection)}
-                        onViewCollection={() => handleCollectionPress(featuredCollection)}
-                    />
-                )}
-
-                {/* Search */}
-                <View style={styles.searchContainer}>
-                    <View style={styles.searchInputWrapper}>
-                        <Search size={18} color={searchQuery ? '#E50914' : '#6B7280'} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search collections, movies, genres..."
-                            placeholderTextColor="#6B7280"
-                            value={searchQuery}
-                            onChangeText={handleSearch}
-                            returnKeyType="search"
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => handleSearch('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                <X size={18} color="#6B7280" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                </View>
-
-                {/* Stats bar */}
-                {stats && (
-                    <View style={styles.statsBar}>
-                        <View style={styles.statCard}>
-                            <Text style={[styles.statValue, { color: '#4ADE80' }]}>{collections.length}</Text>
-                            <Text style={styles.statLabel}>Collections</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={[styles.statValue, { color: '#60A5FA' }]}>{stats.totalFilms?.toLocaleString() || '0'}</Text>
-                            <Text style={styles.statLabel}>Films</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={[styles.statValue, { color: '#C084FC' }]}>{stats.averageFilmsPerCollection || '0'}</Text>
-                            <Text style={styles.statLabel}>Avg/Collection</Text>
-                        </View>
-                    </View>
-                )}
-
-                {/* Filter chips */}
-                <FilterChips
-                    categories={categories.map(c => ({ id: c.id, name: c.name }))}
-                    selected={selectedCategory}
-                    onSelect={setSelectedCategory}
-                />
-
-                {/* Category rows */}
-                {displayedCategories.length > 0 ? (
-                    displayedCategories.map(category => (
-                        <CategoryRow
-                            key={category.id}
-                            category={category}
-                            onCollectionPress={handleCollectionPress}
-                            onViewAll={() => setSelectedCategory(category.id)}
-                        />
-                    ))
-                ) : searchQuery ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyEmoji}>🎬</Text>
-                        <Text style={styles.emptyTitle}>No collections found</Text>
-                        <Text style={styles.emptySubtitle}>
-                            No results match "{searchQuery}". Try a different search.
-                        </Text>
-                        <TouchableOpacity style={styles.clearButton} onPress={() => handleSearch('')}>
-                            <Text style={styles.clearButtonText}>Clear Search</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : null}
-
-                {/* Error */}
-                {error && (
-                    <View style={styles.errorState}>
-                        <Text style={styles.errorEmoji}>⚠️</Text>
-                        <Text style={styles.errorTitle}>Something went wrong</Text>
-                        <Text style={styles.errorSubtitle}>{error}</Text>
-                        <TouchableOpacity style={styles.retryButton} onPress={() => fetchCollections(true)}>
-                            <RefreshCw size={16} color="#fff" />
-                            <Text style={styles.retryButtonText}>Try Again</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Bottom spacing */}
-                <View style={{ height: 40 }} />
-            </ScrollView>
+                contentContainerStyle={styles.listContent}
+            />
         </View>
     );
 }
@@ -174,8 +221,8 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#0A0A1F',
     },
-    scrollView: {
-        flex: 1,
+    listContent: {
+        paddingBottom: 20,
     },
     searchContainer: {
         paddingHorizontal: 16,
@@ -197,31 +244,44 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 15,
     },
-    statsBar: {
+    resultsBar: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 14,
+        paddingBottom: 8,
+    },
+    resultsText: {
+        color: '#9CA3AF',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    scrollHint: {
+        color: '#6B7280',
+        fontSize: 12,
+    },
+    row: {
+        paddingHorizontal: 16,
+        gap: 12,
+        marginBottom: 14,
+    },
+    gridItem: {
+        flex: 1,
+    },
+    footer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 20,
         gap: 10,
     },
-    statCard: {
-        flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderRadius: 12,
-        paddingVertical: 10,
-        alignItems: 'center',
-    },
-    statValue: {
-        fontSize: 20,
-        fontWeight: '800',
-    },
-    statLabel: {
+    footerText: {
         color: '#6B7280',
-        fontSize: 11,
-        marginTop: 2,
+        fontSize: 13,
     },
     emptyState: {
         alignItems: 'center',
-        paddingVertical: 48,
+        paddingVertical: 60,
         paddingHorizontal: 32,
     },
     emptyEmoji: {
@@ -235,38 +295,6 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     emptySubtitle: {
-        color: '#6B7280',
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 16,
-    },
-    clearButton: {
-        backgroundColor: '#E50914',
-        paddingHorizontal: 24,
-        paddingVertical: 10,
-        borderRadius: 10,
-    },
-    clearButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    errorState: {
-        alignItems: 'center',
-        paddingVertical: 48,
-        paddingHorizontal: 32,
-    },
-    errorEmoji: {
-        fontSize: 48,
-        marginBottom: 12,
-    },
-    errorTitle: {
-        color: '#D1D5DB',
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 6,
-    },
-    errorSubtitle: {
         color: '#6B7280',
         fontSize: 14,
         textAlign: 'center',

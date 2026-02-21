@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Play, Clock, Calendar, Film, Star, Check, Share2 } from 'lucide-react-native';
 import { CollectionDetails, Movie } from '../../types';
-import { getBackdropUrl, getPosterUrl } from '../../services/tmdb';
+import { getBackdropUrl, getPosterUrl, getCollectionDetailsLight } from '../../services/tmdb';
 import CollectionsService from '../../services/collectionsService';
 import CollectionFilmCard from '../../components/Collections/CollectionFilmCard';
 
@@ -52,25 +52,46 @@ export default function CollectionDetailScreen() {
     const loadCollection = async () => {
         try {
             setLoading(true);
-            // Try to get from cache first via tmdb
-            const { getCachedCollections } = require('../../services/tmdb');
-            const cached = getCachedCollections();
-            const found = cached.find((c: CollectionDetails) => String(c.id) === String(id));
+
+            // Try cache first
+            let found: CollectionDetails | null = null;
+            try {
+                const { getCachedCollections } = require('../../services/tmdb');
+                const cached = getCachedCollections();
+                found = cached.find((c: CollectionDetails) => String(c.id) === String(id)) || null;
+            } catch { }
+
+            // If not in cache, fetch directly from TMDB
+            if (!found) {
+                found = await getCollectionDetailsLight(Number(id));
+            }
 
             if (found) {
                 setCollection(found);
                 // Load user progress
-                const userProgress = await CollectionsService.getFranchiseProgress(Number(id));
-                if (userProgress) {
-                    setProgress(userProgress.completion_percentage);
-                    setWatchedFilms(userProgress.watched_films);
-                }
+                try {
+                    const userProgress = await CollectionsService.getFranchiseProgress(Number(id));
+                    if (userProgress) {
+                        setProgress(userProgress.completion_percentage);
+                        setWatchedFilms(userProgress.watched_films);
+                    }
+                } catch { }
             }
         } catch (err) {
             console.error('Error loading collection:', err);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleStartPress = () => {
+        if (!collection?.parts?.length) return;
+        // Sort by release date, find first unwatched film
+        const sorted = [...collection.parts].sort(
+            (a, b) => new Date(a.release_date || '').getTime() - new Date(b.release_date || '').getTime()
+        );
+        const nextUnwatched = sorted.find(f => !watchedFilms.includes(f.id)) || sorted[0];
+        router.push(`/movie/${nextUnwatched.id}`);
     };
 
     if (loading) {
@@ -188,13 +209,15 @@ export default function CollectionDetailScreen() {
                                     <Clock size={14} color="#9CA3AF" />
                                     <Text style={styles.statText}>{formatRuntime(collection.total_runtime)}</Text>
                                 </View>
-                                {firstYear && lastYear && (
+                            </View>
+                            {firstYear && lastYear && (
+                                <View style={styles.statsRow}>
                                     <View style={styles.stat}>
                                         <Calendar size={14} color="#9CA3AF" />
                                         <Text style={styles.statText}>{firstYear}-{lastYear}</Text>
                                     </View>
-                                )}
-                            </View>
+                                </View>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -217,10 +240,10 @@ export default function CollectionDetailScreen() {
 
                 {/* CTA buttons */}
                 <View style={styles.ctaRow}>
-                    <TouchableOpacity style={styles.ctaPrimary} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.ctaPrimary} activeOpacity={0.8} onPress={handleStartPress}>
                         <Play size={18} color="#fff" fill="#fff" />
                         <Text style={styles.ctaPrimaryText}>
-                            {progress > 0 ? 'Continue Marathon' : 'Start Marathon'}
+                            {progress > 0 ? 'Continue' : 'Start'}
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.ctaIcon} activeOpacity={0.8}>
@@ -251,7 +274,7 @@ export default function CollectionDetailScreen() {
                                     {nextFilm.release_date ? new Date(nextFilm.release_date).getFullYear() : ''}
                                 </Text>
                             </View>
-                            <TouchableOpacity style={styles.nextFilmPlay} activeOpacity={0.8}>
+                            <TouchableOpacity style={styles.nextFilmPlay} activeOpacity={0.8} onPress={() => nextFilm && handleFilmPress(nextFilm)}>
                                 <Play size={14} color="#fff" fill="#fff" />
                                 <Text style={styles.nextFilmPlayText}>Watch</Text>
                             </TouchableOpacity>
