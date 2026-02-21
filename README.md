@@ -49,9 +49,6 @@
 </tr>
 </table>
 
-> **📸 Replace the placeholders above with actual screenshots from your device!**
->
-> Use `npx expo run:android` or a screenshot tool to capture and add them to an `assets/screenshots/` folder.
 
 </div>
 
