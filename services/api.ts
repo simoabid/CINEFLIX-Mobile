@@ -17,7 +17,7 @@ export const setAuthToken = (token: string | null) => {
 
 export const getAuthToken = () => authToken;
 
-interface ApiResponse<T> { success: boolean; data?: T; error?: string; message?: string; }
+interface ApiResponse<T> { success: boolean; data?: T; error?: string; message?: string; status?: number; }
 
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
@@ -33,7 +33,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
         const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
         const data = await response.json();
-        if (!response.ok) return { success: false, error: data.error || `HTTP error ${response.status}` };
+        if (!response.ok) return { success: false, error: data.error || `HTTP error ${response.status}`, status: response.status };
         return data;
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Network error' };

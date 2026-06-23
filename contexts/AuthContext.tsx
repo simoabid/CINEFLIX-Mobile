@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, User, setAuthToken, getAuthToken } from '../services/api';
 
@@ -43,13 +43,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const response = await authApi.getMe();
             if (response.success && response.data) {
                 setUser(response.data.user);
-            } else {
+                return;
+            }
+            // Only clear the stored token when the backend explicitly rejects it
+            // (expired/invalid session). Transient failures (offline, backend
+            // down, 5xx) must NOT delete a valid token — otherwise opening the
+            // app while offline would force a needless re-login.
+            if (response.status === 401 || response.status === 403) {
                 setAuthToken(null);
                 setUser(null);
             }
-        } catch (error) {
-            setAuthToken(null);
-            setUser(null);
+        } catch {
+            // Network error — keep the token and current user state intact.
         }
     }, []);
 
@@ -149,7 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     }, []);
 
-    const value: AuthContextType = {
+    const value = useMemo<AuthContextType>(() => ({
         user,
         isAuthenticated: !!user,
         isLoading,
@@ -160,7 +165,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         updateProfile,
         changePassword,
         refreshUser,
-    };
+    }), [user, isLoading, login, register, googleLogin, logout, updateProfile, changePassword, refreshUser]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
