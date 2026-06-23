@@ -20,6 +20,17 @@ export default function RootLayout() {
                             }}
                         >
                             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                            {/* Auth */}
+                            <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+                            <Stack.Screen name="signup" options={{ presentation: 'modal' }} />
+                            {/* Browse destinations (web navbar parity) */}
+                            <Stack.Screen name="movies" />
+                            <Stack.Screen name="tv-shows" />
+                            <Stack.Screen name="new-popular" />
+                            <Stack.Screen name="browse" />
+                            <Stack.Screen name="continue-watching" />
+                            {/* Playback */}
+                            <Stack.Screen name="watch/[type]/[id]" options={{ animation: 'fade', gestureEnabled: false }} />
                         </Stack>
                         <StatusBar style="light" backgroundColor="#0A0A1F" />
                     </View>
