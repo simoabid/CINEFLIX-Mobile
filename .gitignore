@@ -42,3 +42,6 @@ yarn-error.*
 
 #Other Folders
 Context-prompts-tweaks/
+CINEFLIX-Page
+CINEFLIX-Page/*
+CINEFLIX-Page/
